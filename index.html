@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>Parkkipulma - Versio 2.2</title>
+    <title>Parkkipulma - Vakaa Versio 2.2</title>
     <style>
         html, body { overscroll-behavior-y: contain; touch-action: none; }
         body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif; display: flex; flex-direction: column; justify-content: center; align-items: center; min-height: 100vh; margin: 0; background-color: #f0f0f0; color: #333; }
@@ -74,7 +74,6 @@
             { side: 'top',    winCondition: 'y', winValue: 0,             orientation: 'vertical',   startPos: {x: 4, y: 0},             finalPos: {x: 4, y: GRID_SIZE - 2} }
         ];
 
-        // --- APUFUNKTIOT ---
         function createOccupationGrid(entities, ignoreId = null) {
             const grid = Array(GRID_SIZE).fill(null).map(() => Array(GRID_SIZE).fill(null));
             for (const entity of entities) {
@@ -91,44 +90,31 @@
         }
 
         function isSpaceFree(x, y, size, orientation, grid) {
-            // Reuna-tarkistukset
             if (orientation === 'horizontal' && (x + size > GRID_SIZE || y >= GRID_SIZE || x < 0 || y < 0)) return false;
             if (orientation === 'vertical' && (y + size > GRID_SIZE || x >= GRID_SIZE || x < 0 || y < 0)) return false;
-            
-            // Tarkista itse auton viemä tila
             for (let i = 0; i < size; i++) {
                 if (orientation === 'horizontal') { if (grid[y][x + i]) return false; } 
                 else { if (grid[y + i][x]) return false; }
             }
-            
-            // KORJAUS: Uusi, turvallinen deadlock-esto
             if (orientation === 'horizontal') {
                 const leftEnd = x - 1;
                 const rightEnd = x + size;
-                // Tarkista vasen pääty vain, jos se on ruudukon sisällä
                 if (leftEnd >= 0 && grid[y][leftEnd] && grid[y][leftEnd].orientation === 'horizontal') return false;
-                // Tarkista oikea pääty vain, jos se on ruudukon sisällä
                 if (rightEnd < GRID_SIZE && grid[y][rightEnd] && grid[y][rightEnd].orientation === 'horizontal') return false;
-            } else { // vertical
+            } else {
                 const topEnd = y - 1;
                 const bottomEnd = y + size;
-                // Tarkista yläpääty vain, jos se on ruudukon sisällä
-                if (topEnd >= 0 && grid[topEnd][x] && grid[topEnd][x].orientation === 'vertical') return false;
-                // Tarkista alapääty vain, jos se on ruudukon sisällä
-                if (bottomEnd < GRID_SIZE && grid[bottomEnd][x] && grid[bottomEnd][x].orientation === 'vertical') return false;
+                if (topEnd >= 0 && grid[topEnd] && grid[topEnd][x] && grid[topEnd][x].orientation === 'vertical') return false;
+                if (bottomEnd < GRID_SIZE && grid[bottomEnd] && grid[bottomEnd][x] && grid[bottomEnd][x].orientation === 'vertical') return false;
             }
-
             return true;
         }
-
-        // --- PÄÄLOGIIKKA ---
+        
         function generateLevel(difficulty) {
             const exit = possibleExits[Math.floor(Math.random() * possibleExits.length)];
             const playerCar = { id: 'player-car', type: 'car', x: exit.startPos.x, y: exit.startPos.y, size: 2, orientation: exit.orientation, color: '#E74C3C' };
-            let entities = [playerCar];
-            let carIdCounter = 1;
-            let obstacleIdCounter = 1;
-
+            let entities = [playerCar]; let carIdCounter = 1; let obstacleIdCounter = 1;
+            
             const numObstacles = Math.floor(GRID_SIZE / 4);
             for (let i = 0; i < numObstacles; i++) {
                 let grid = createOccupationGrid(entities);
@@ -142,19 +128,17 @@
                     }
                 }
             }
+            
             for (let i = 0; i < difficulty; i++) {
                 const currentGrid = createOccupationGrid(entities);
                 if (Math.random() < 0.8) {
-                    const orientation = Math.random() < 0.5 ? 'horizontal' : 'vertical';
-                    const size = Math.random() < 0.6 ? 2 : 3;
+                    const orientation = Math.random() < 0.5 ? 'horizontal' : 'vertical'; const size = Math.random() < 0.6 ? 2 : 3;
                     let possiblePlacements = [];
                     for (let y = 0; y < GRID_SIZE; y++) {
                         for (let x = 0; x < GRID_SIZE; x++) {
                             if (exit.orientation === 'horizontal' && y === exit.finalPos.y) continue;
                             if (exit.orientation === 'vertical' && x === exit.finalPos.x) continue;
-                            if (isSpaceFree(x, y, size, orientation, currentGrid)) {
-                                possiblePlacements.push({ x, y });
-                            }
+                            if (isSpaceFree(x, y, size, orientation, currentGrid)) possiblePlacements.push({ x, y });
                         }
                     }
                     if (possiblePlacements.length > 0) {
@@ -167,25 +151,13 @@
                         const carToMove = movableCars[Math.floor(Math.random() * movableCars.length)];
                         const tempGrid = createOccupationGrid(entities, carToMove.id);
                         let possibleMoves = [];
-                        if (carToMove.orientation === 'horizontal') {
-                            for (let x = 0; x <= GRID_SIZE - carToMove.size; x++) {
-                                if (isSpaceFree(x, carToMove.y, carToMove.size, 'horizontal', tempGrid)) possibleMoves.push({ x });
-                            }
-                        } else {
-                            for (let y = 0; y <= GRID_SIZE - carToMove.size; y++) {
-                                if (isSpaceFree(carToMove.x, y, carToMove.size, 'vertical', tempGrid)) possibleMoves.push({ y });
-                            }
-                        }
-                        if (possibleMoves.length > 1) {
-                            const move = possibleMoves[Math.floor(Math.random() * possibleMoves.length)];
-                            carToMove.x = move.x ?? carToMove.x;
-                            carToMove.y = move.y ?? carToMove.y;
-                        }
+                        if (carToMove.orientation === 'horizontal') { for (let x = 0; x <= GRID_SIZE - carToMove.size; x++) if (isSpaceFree(x, carToMove.y, carToMove.size, 'horizontal', tempGrid)) possibleMoves.push({ x });
+                        } else { for (let y = 0; y <= GRID_SIZE - carToMove.size; y++) if (isSpaceFree(carToMove.x, y, carToMove.size, 'vertical', tempGrid)) possibleMoves.push({ y }); }
+                        if (possibleMoves.length > 1) { const move = possibleMoves[Math.floor(Math.random() * possibleMoves.length)]; carToMove.x = move.x ?? carToMove.x; carToMove.y = move.y ?? carToMove.y; }
                     }
                 }
             }
-            playerCar.x = exit.finalPos.x;
-            playerCar.y = exit.finalPos.y;
+            playerCar.x = exit.finalPos.x; playerCar.y = exit.finalPos.y;
             const finalGrid = createOccupationGrid(entities, 'player-car');
             if (!isSpaceFree(playerCar.x, playerCar.y, playerCar.size, playerCar.orientation, finalGrid)) {
                 return generateLevel(difficulty);
@@ -252,7 +224,7 @@
             updateCarPosition(el, entityData);
             board.appendChild(el);
         }
-        
+
         function checkWinCondition() {
             const playerCar = carsData.find(c => c.id === 'player-car');
             const winValue = (currentExit.side === 'right' || currentExit.side === 'bottom') ? GRID_SIZE - playerCar.size : 0;
@@ -280,7 +252,7 @@
         function loadHighScore() {
             const savedScore = localStorage.getItem('parkkipulmaHighScore');
             if (savedScore) {
-                highScore = JSON.parse(savedScore);
+                try { highScore = JSON.parse(savedScore); } catch (e) { console.error("Could not parse high score:", e); }
             }
             playerNameInput.value = highScore.name;
             updateHighScoreDisplay();
@@ -308,137 +280,24 @@
             selectedCarId = carId;
             document.getElementById(selectedCarId)?.classList.add('selected');
         }
-
-        // --- Tapahtumankäsittelijät ---
-        function getEventCoords(e) {
-            if (e.touches && e.touches.length) {
-                return { x: e.touches[0].clientX, y: e.touches[0].clientY };
-            }
-            return { x: e.clientX, y: e.clientY };
-        }
-
-        function onInteractionStart(e) {
-            if (modal.style.display === 'flex' || (e.type === 'mousedown' && e.button !== 0)) return;
-            const targetEl = e.target.closest('.entity');
-            if (!targetEl || targetEl.classList.contains('obstacle')) {
-                deselectCar();
-                return;
-            }
-            if (targetEl.classList.contains('car')) {
-                e.preventDefault();
-                handleCarSelection(targetEl.id);
-                targetEl.classList.remove('snapping');
-                activeCarEl = targetEl;
-                activeCarData = carsData.find(c => c.id === activeCarEl.id);
-                const coords = getEventCoords(e);
-                startX = coords.x - activeCarEl.offsetLeft;
-                startY = coords.y - activeCarEl.offsetTop;
-                document.addEventListener('mousemove', onInteractionMove);
-                document.addEventListener('touchmove', onInteractionMove, { passive: false });
-                document.addEventListener('mouseup', onInteractionEnd);
-                document.addEventListener('touchend', onInteractionEnd);
-            }
-        }
-
-        function onInteractionMove(e) {
-            if (!activeCarEl) return;
-            e.preventDefault();
-            const coords = getEventCoords(e);
-            if (activeCarData.orientation === 'horizontal') {
-                let newLeft = coords.x - startX;
-                const maxLeft = (GRID_SIZE - activeCarData.size) * CELL_SIZE;
-                activeCarEl.style.left = `${Math.max(0, Math.min(newLeft, maxLeft))}px`;
-            } else {
-                let newTop = coords.y - startY;
-                const maxTop = (GRID_SIZE - activeCarData.size) * CELL_SIZE;
-                activeCarEl.style.top = `${Math.max(0, Math.min(newTop, maxTop))}px`;
-            }
-        }
-
-        function onInteractionEnd() {
-            if (!activeCarEl) return;
-            const startGridX = activeCarData.x;
-            const startGridY = activeCarData.y;
-            const targetPixelX = activeCarEl.offsetLeft;
-            const targetPixelY = activeCarEl.offsetTop;
-            const tempGrid = createOccupationGrid(carsData, activeCarData.id);
-            let finalX = startGridX;
-            let finalY = startGridY;
-            if (activeCarData.orientation === 'horizontal') {
-                const targetGridX = Math.round(targetPixelX / CELL_SIZE);
-                const sign = Math.sign(targetGridX - startGridX);
-                if (sign !== 0) {
-                    for (let i = 1; i <= Math.abs(targetGridX - startGridX); i++) {
-                        const nextX = startGridX + (i * sign);
-                        if (isSpaceFree(nextX, startGridY, activeCarData.size, 'horizontal', tempGrid)) {
-                            finalX = nextX;
-                        } else {
-                            break;
-                        }
-                    }
-                }
-            } else {
-                const targetGridY = Math.round(targetPixelY / CELL_SIZE);
-                const sign = Math.sign(targetGridY - startGridY);
-                if (sign !== 0) {
-                    for (let i = 1; i <= Math.abs(targetGridY - startGridY); i++) {
-                        const nextY = startGridY + (i * sign);
-                        if (isSpaceFree(startGridX, nextY, activeCarData.size, 'vertical', tempGrid)) {
-                            finalY = nextY;
-                        } else {
-                            break;
-                        }
-                    }
-                }
-            }
-            handleMoveSuccess(activeCarData, finalX, finalY);
-            activeCarEl = null;
-            activeCarData = null;
-            document.removeEventListener('mousemove', onInteractionMove);
-            document.removeEventListener('touchmove', onInteractionMove);
-            document.removeEventListener('mouseup', onInteractionEnd);
-            document.removeEventListener('touchend', onInteractionEnd);
-        }
         
-        function resizeGame() {
-            const screenWidth = window.innerWidth;
-            const boardWidth = board.offsetWidth;
-            if (boardWidth === 0) return;
-            const scale = Math.min(1, (screenWidth * 0.95) / boardWidth);
-            gameViewport.style.transform = `scale(${scale})`;
-        }
-        
-        // --- Muut kuuntelijat ---
+        function getEventCoords(e) { if (e.touches && e.touches.length) return { x: e.touches[0].clientX, y: e.touches[0].clientY }; return { x: e.clientX, y: e.clientY }; }
+        function onInteractionStart(e) { if (modal.style.display === 'flex' || (e.type === 'mousedown' && e.button !== 0)) return; const targetEl = e.target.closest('.entity'); if (!targetEl || targetEl.classList.contains('obstacle')) { deselectCar(); return; } if (targetEl.classList.contains('car')) { e.preventDefault(); handleCarSelection(targetEl.id); targetEl.classList.remove('snapping'); activeCarEl = targetEl; activeCarData = carsData.find(c => c.id === activeCarEl.id); const coords = getEventCoords(e); startX = coords.x - activeCarEl.offsetLeft; startY = coords.y - activeCarEl.offsetTop; document.addEventListener('mousemove', onInteractionMove); document.addEventListener('touchmove', onInteractionMove, { passive: false }); document.addEventListener('mouseup', onInteractionEnd); document.addEventListener('touchend', onInteractionEnd); } }
+        function onInteractionMove(e) { if (!activeCarEl) return; e.preventDefault(); const coords = getEventCoords(e); if (activeCarData.orientation === 'horizontal') { let newLeft = coords.x - startX; const maxLeft = (GRID_SIZE - activeCarData.size) * CELL_SIZE; activeCarEl.style.left = `${Math.max(0, Math.min(newLeft, maxLeft))}px`; } else { let newTop = coords.y - startY; const maxTop = (GRID_SIZE - activeCarData.size) * CELL_SIZE; activeCarEl.style.top = `${Math.max(0, Math.min(newTop, maxTop))}px`; } }
+        function onInteractionEnd() { if (!activeCarEl) return; const startGridX = activeCarData.x; const startGridY = activeCarData.y; const targetPixelX = activeCarEl.offsetLeft; const targetPixelY = activeCarEl.offsetTop; const tempGrid = createOccupationGrid(carsData, activeCarData.id); let finalX = startGridX; let finalY = startGridY; if (activeCarData.orientation === 'horizontal') { const targetGridX = Math.round(targetPixelX / CELL_SIZE); const sign = Math.sign(targetGridX - startGridX); if (sign !== 0) { for (let i = 1; i <= Math.abs(targetGridX - startGridX); i++) { const nextX = startGridX + (i * sign); if (isSpaceFree(nextX, startGridY, activeCarData.size, 'horizontal', tempGrid)) { finalX = nextX; } else { break; } } } } else { const targetGridY = Math.round(targetPixelY / CELL_SIZE); const sign = Math.sign(targetGridY - startGridY); if (sign !== 0) { for (let i = 1; i <= Math.abs(targetGridY - startGridY); i++) { const nextY = startGridY + (i * sign); if (isSpaceFree(startGridX, nextY, activeCarData.size, 'vertical', tempGrid)) { finalY = nextY; } else { break; } } } } handleMoveSuccess(activeCarData, finalX, finalY); activeCarEl = null; activeCarData = null; document.removeEventListener('mousemove', onInteractionMove); document.removeEventListener('touchmove', onInteractionMove); document.removeEventListener('mouseup', onInteractionEnd); document.removeEventListener('touchend', onInteractionEnd); }
+        function resizeGame() { const screenWidth = window.innerWidth; const boardWidth = board.offsetWidth; if (boardWidth === 0) return; const scale = Math.min(1, (screenWidth * 0.95) / boardWidth); gameViewport.style.transform = `scale(${scale})`; }
+        function getRandomColor() { const colors = ['#3498DB', '#2ECC71', '#F1C40F', '#9B59B6', '#E67E22', '#1ABC9C', '#34495E', '#e84393', '#00cec9']; return colors[Math.floor(Math.random() * colors.length)]; }
+        function updateCarPosition(element, data) { element.classList.add('snapping'); element.style.left = `${data.x * CELL_SIZE}px`; element.style.top = `${data.y * CELL_SIZE}px`; }
+        function deselectCar() { if (selectedCarId) { document.getElementById(selectedCarId)?.classList.remove('selected'); } selectedCarId = null; }
+
+        // --- KUUNTELIJAT ---
         nextLevelButton.addEventListener('click', () => setupLevel(currentLevelIndex + 1));
         resetButton.addEventListener('click', () => setupLevel(currentLevelIndex));
         playerNameInput.addEventListener('input', () => { highScore.name = playerNameInput.value || 'Pelaaja'; saveHighScore(); });
-        board.addEventListener('mousedown', onInteractionStart);
-        board.addEventListener('touchstart', onInteractionStart, { passive: false });
+        board.addEventListener('mousedown', onInteractionStart); board.addEventListener('touchstart', onInteractionStart, { passive: false });
         window.addEventListener('resize', resizeGame);
-        document.addEventListener('keydown', (e) => {
-            if (!selectedCarId || activeCarEl) return;
-            const carData = carsData.find(c => c.id === selectedCarId);
-            if (!carData) return;
-            let dx = 0, dy = 0;
-            switch (e.key) {
-                case 'ArrowLeft': if (carData.orientation === 'horizontal') dx = -1; break;
-                case 'ArrowRight': if (carData.orientation === 'horizontal') dx = 1; break;
-                case 'ArrowUp': if (carData.orientation === 'vertical') dy = -1; break;
-                case 'ArrowDown': if (carData.orientation === 'vertical') dy = 1; break;
-                case 'Escape': deselectCar(); break;
-                default: return;
-            }
-            if (dx !== 0 || dy !== 0) {
-                e.preventDefault();
-                const newX = carData.x + dx;
-                const newY = carData.y + dy;
-                const grid = createOccupationGrid(carsData, carData.id);
-                if (isSpaceFree(newX, newY, carData.size, carData.orientation, grid)) {
-                    handleMoveSuccess(carData, newX, newY);
-                }
-            }
-        });
-
+        document.addEventListener('keydown', (e) => { if (!selectedCarId || activeCarEl) return; const carData = carsData.find(c => c.id === selectedCarId); if (!carData) return; let dx = 0, dy = 0; switch (e.key) { case 'ArrowLeft': if (carData.orientation === 'horizontal') dx = -1; break; case 'ArrowRight': if (carData.orientation === 'horizontal') dx = 1; break; case 'ArrowUp': if (carData.orientation === 'vertical') dy = -1; break; case 'ArrowDown': if (carData.orientation === 'vertical') dy = 1; break; case 'Escape': deselectCar(); break; default: return; } if (dx !== 0 || dy !== 0) { e.preventDefault(); const newX = carData.x + dx; const newY = carData.y + dy; const grid = createOccupationGrid(carsData, carData.id); if (isSpaceFree(newX, newY, carData.size, carData.orientation, grid)) { handleMoveSuccess(carData, newX, newY); } } });
+        
         // --- PELIN KÄYNNISTYS ---
         loadHighScore();
         setupLevel(0);
